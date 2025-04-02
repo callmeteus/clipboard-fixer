@@ -1,6 +1,9 @@
 ; Clipboard Fixer Installer
 Outfile "out\clipboard-fixer-installer.exe"
-InstallDir "$PROGRAMFILES\Clipboard Fixer"
+
+# Let's target %APPDATA% instead of %PROGRAMFILES% because the `config` is editable
+# and `Program Files` requires admin privileges
+InstallDir "$APPDATA\Clipboard Fixer"
 RequestExecutionLevel admin
 ShowInstDetails show
 
@@ -32,12 +35,15 @@ Var StartMenuFolder
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 
-; Define Uninstaller Name
-!define UNINSTALLER "uninstall.exe"
-
 Section "Install"
+    # Set the installation directory
     SetOutPath "$INSTDIR"
-    File "..\..\out\clipboard-fixer.exe"
+
+    # Standard configuration files
+    File /oname=$OUTDIR\config\replacers\embeddables.json ..\..\config\replacers\embeddables.json
+
+    # Main executable
+    File ..\..\out\clipboard-fixer.exe
 
     ; Create Start Menu Shortcut
     CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
@@ -49,17 +55,17 @@ Section "Install"
     skip_startup:
 
     ; Create Uninstaller
-    WriteUninstaller "$INSTDIR\$UNINSTALLER"
+    WriteUninstaller "$INSTDIR\uninstall.exe"
 
     ; Register Uninstaller in Control Panel
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClipboardFixer" "DisplayName" "Clipboard Fixer"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClipboardFixer" "UninstallString" "$INSTDIR\$UNINSTALLER"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClipboardFixer" "UninstallString" "$INSTDIR\uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
     ; Remove Installed Files
     Delete "$INSTDIR\clipboard-fixer.exe"
-    Delete "$INSTDIR\$UNINSTALLER"
+    Delete "$INSTDIR\uninstall.exe"
 
     ; Remove from Startup
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "ClipboardFixer"
