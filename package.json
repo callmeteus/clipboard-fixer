@@ -1,5 +1,5 @@
 {
-    "name": "fix-x-links",
+    "name": "link-fixer",
     "version": "1.0.0",
     "author": "Gio Pavanelli",
     "repository": {
@@ -19,11 +19,21 @@
         "bun",
         "clipboard",
         "x.com",
-        "fixupx.com"
+        "fixupx.com",
+        "fix-x-links",
+        "link-fixer",
+        "url-fixer",
+        "embeddable-links-fixer",
+        "embed-links-fixer",
+        "embeddable-links-fixer-script",
+        "embed-links-fixer-script",
+        "embeddable-links-fixer-bun",
+        "embed-links-fixer-bun"
     ],
     "license": "MIT",
     "scripts": {
-        "test": "bun --watch index.ts"
+        "test": "bun --watch index.ts",
+        "bundle": "bun build index.ts --compile --sourcemap --minify --target=bun-windows-x64-modern --windows-icon=assets\\icon-enabled.ico --windows-hide-console --outfile out/link-fixer"
     },
     "dependencies": {
         "trayicon": "^1.2.2"

@@ -8,9 +8,11 @@
  * @version 1.1.0
  */
 
-import { readFileSync } from "fs";
-import { join } from "path";
 import Tray from "trayicon";
+
+import { file } from "bun";
+import iconDisabledUrl from "./assets/icon-disabled.ico" with { type: "file" };
+import iconEnabledUrl from "./assets/icon-enabled.ico" with { type: "file" };
 
 /**
  * Class representing a URL replacer
@@ -127,7 +129,7 @@ class ClipboardMonitor {
     /**
      * Update the tray icon and menu.
      */
-    private updateTray() {
+    private async updateTray() {
         // Ignore if tray is not initialized
         if (!this.tray) {
             return;
@@ -135,11 +137,11 @@ class ClipboardMonitor {
         
         try {
             // Get icon path
-            const iconPathName = join(__dirname, "assets", this.isMonitoringEnabled ? "icon-enabled.ico" : "icon-disabled.ico");
+            const iconPathName = this.isMonitoringEnabled ? iconEnabledUrl : iconDisabledUrl;
 
             // Read icon data
-            const iconBuff = readFileSync(iconPathName);
-            
+            const iconBuff = Buffer.from(await file(iconPathName).bytes());
+
             // Update icon
             this.tray.setIcon(iconBuff);
         } catch (error) {
@@ -184,10 +186,6 @@ class ClipboardMonitor {
     exit() {
         console.log("Exiting application");
         this.stopMonitoring();
-        
-        if (this.tray) {
-            this.tray.destroy();
-        }
         
         process.exit(0);
     }
