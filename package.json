@@ -12,7 +12,7 @@
         "@types/node": "^22.14.0"
     },
     "bugs": {
-        "url": "https://github.com/giofolf/fix-x-links/issues"
+        "url": "https://github.com/callmeteus/fix-x-links/issues"
     },
     "description": "Bun script to monitor Windows clipboard for x.com URLs and replace them with fixupx.com",
     "keywords": [

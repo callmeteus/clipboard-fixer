@@ -1,0 +1,14 @@
+[
+    {
+        "pattern": "/https?:\\/\\/(?<!fixup)(twitter|x)\\.com/g",
+        "replacement": "https://fixupx.com"
+    },
+    {
+        "pattern": "/https?:\\/\\/(?<!dd)instagram\\.com/g",
+        "replacement": "https://ddinstagram.com"
+    },
+    {
+        "pattern": "/https?:\\/\\/(?<!dd)instagram\\.com/g",
+        "replacement": "https://fixuptiktok.com"
+    }
+]
