@@ -1,4 +1,4 @@
-# fix-x-links
+# embeddable-links-fixer
 
 To install dependencies:
 
