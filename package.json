@@ -1,0 +1,31 @@
+{
+    "name": "fix-x-links",
+    "version": "1.0.0",
+    "author": "Gio Pavanelli",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/giofolf/fix-x-links.git"
+    },
+    "main": "index.js",
+    "devDependencies": {
+        "@types/bun": "^1.2.8",
+        "@types/node": "^22.14.0"
+    },
+    "bugs": {
+        "url": "https://github.com/giofolf/fix-x-links/issues"
+    },
+    "description": "Bun script to monitor Windows clipboard for x.com URLs and replace them with fixupx.com",
+    "keywords": [
+        "bun",
+        "clipboard",
+        "x.com",
+        "fixupx.com"
+    ],
+    "license": "MIT",
+    "scripts": {
+        "test": "bun --watch index.ts"
+    },
+    "dependencies": {
+        "trayicon": "^1.2.2"
+    }
+}
