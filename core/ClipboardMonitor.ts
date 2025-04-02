@@ -5,16 +5,16 @@ import iconDisabledUrl from "../assets/icon-disabled.ico" with { type: "file" };
 import iconEnabledUrl from "../assets/icon-enabled.ico" with { type: "file" };
 
 import path from "path";
-import { UrlReplacer } from "../model/UrlReplacer";
+import { ContentReplacer } from "../model/UrlReplacer";
 
 /**
  * Class for clipboard monitoring and fixing links
  */
 export class ClipboardMonitor {
     /**
-     * A list of URL replacers.
+     * A list of content replacers.
      */
-    private replacers: UrlReplacer[] = [];
+    private replacers: ContentReplacer[] = [];
 
     /**
      * The last clipboard content.
@@ -65,11 +65,16 @@ export class ClipboardMonitor {
             onlyFiles: true
         })) {
             // Load the rules from the file
-            const replacer = await file(filePath).json();
+            const ruleList = await file(filePath).json();
 
-            // Add each replacer to the list
-            for (const rules of replacer) {
-                this.replacers.push(new UrlReplacer(rules.pattern, rules.replacement));
+            // Add each rule to the list
+            for (const rule of ruleList) {
+                this.replacers.push(
+                    new ContentReplacer(
+                        new RegExp(rule.pattern, rule.flags ?? "g"),
+                        rule.replacement
+                    )
+                );
             }
         }
 

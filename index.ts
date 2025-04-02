@@ -1,7 +1,5 @@
 /**
  * Clipboard monitor script with Windows tray icon.
- * This script monitors the clipboard for fixable URLs and replaces them with the correct URL.
- * Includes a system tray icon for easy enabling/disabling.
  * 
  * @author Gio Pavanelli (https://github.com/callmeteus)
  * @license MIT

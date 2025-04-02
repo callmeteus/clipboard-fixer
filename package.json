@@ -1,10 +1,10 @@
 {
-    "name": "link-fixer",
+    "name": "clipboard-fixer",
     "version": "1.0.0",
     "author": "Gio Pavanelli",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/giofolf/fix-x-links.git"
+        "url": "git+https://github.com/callmeteus/clipboard-fixer.git"
     },
     "main": "index.js",
     "devDependencies": {
@@ -12,28 +12,21 @@
         "@types/node": "^22.14.0"
     },
     "bugs": {
-        "url": "https://github.com/callmeteus/fix-x-links/issues"
+        "url": "https://github.com/callmeteus/clipboard-fixer/issues"
     },
-    "description": "Bun script to monitor Windows clipboard for x.com URLs and replace them with fixupx.com",
+    "description": "An application to monitor the clipboard and make changes to its content based on a set of rules.",
     "keywords": [
         "bun",
         "clipboard",
-        "x.com",
-        "fixupx.com",
-        "fix-x-links",
-        "link-fixer",
-        "url-fixer",
-        "embeddable-links-fixer",
-        "embed-links-fixer",
-        "embeddable-links-fixer-script",
-        "embed-links-fixer-script",
-        "embeddable-links-fixer-bun",
-        "embed-links-fixer-bun"
+        "clipboard-monitor",
+        "clipboard-fixer",
+        "clipboard-fix",
+        "clipboard-fixer-script"
     ],
     "license": "MIT",
     "scripts": {
         "test": "bun --watch index.ts",
-        "bundle": "bun build index.ts --compile --sourcemap --minify --target=bun-windows-x64-modern --windows-icon=assets\\icon-enabled.ico --windows-hide-console --outfile out/link-fixer"
+        "bundle": "bun build index.ts --compile --sourcemap --minify --target=bun-windows-x64-modern --windows-icon=assets\\icon-enabled.ico --windows-hide-console --outfile out/clipboard-fixer"
     },
     "dependencies": {
         "trayicon": "^1.2.2"

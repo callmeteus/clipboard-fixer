@@ -1,4 +1,10 @@
-# embeddable-links-fixer
+# clipboard-fixer
+
+An application to monitor the clipboard and make changes to its content based on a set of rules.
+
+## Development
+
+### Install
 
 To install dependencies:
 
@@ -12,26 +18,7 @@ To run:
 bun run index.ts
 ```
 
-## Run on startup
+## Usage
 
-To run on startup, run the following command:
-
-```bash
-bin/setup
-```
-
-If on Windows, the script will create a shortcut in the startup folder.
-
-If on Linux, the script will create a desktop file in the startup folder.
-
-## Uninstall
-
-To uninstall, run the following command:
-
-```bash
-bin/uninstall
-```
-
-If on Windows, the script will remove the shortcut from the startup folder.
-
-If on Linux, the script will remove the desktop file from the startup folder.
+1. Run the application.
+2. Press Ctrl+C to exit.
