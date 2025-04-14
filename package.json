@@ -9,7 +9,8 @@
     "main": "index.js",
     "devDependencies": {
         "@types/bun": "^1.2.8",
-        "@types/node": "^22.14.0"
+        "@types/node": "^22.14.0",
+        "@types/winston": "^2.4.4"
     },
     "bugs": {
         "url": "https://github.com/callmeteus/clipboard-fixer/issues"
@@ -26,9 +27,12 @@
     "license": "MIT",
     "scripts": {
         "test": "bun --watch index.ts",
+        "watch": "bun --watch index.ts",
         "bundle": "bun build index.ts --compile --sourcemap --minify --target=bun-windows-x64-modern --windows-icon=assets\\icon-enabled.ico --windows-hide-console --outfile out/clipboard-fixer"
     },
     "dependencies": {
-        "trayicon": "^1.2.2"
+        "clipboardy": "^4.0.0",
+        "trayicon": "^1.2.2",
+        "winston": "^3.12.0"
     }
 }

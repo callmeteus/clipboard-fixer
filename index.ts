@@ -7,27 +7,66 @@
  */
 
 import { ClipboardMonitor } from "./core/ClipboardMonitor";
+import { Logger } from "./core/Logger";
+
+// Set up global error handlers
+process.on("uncaughtException", (error: Error) => {
+    Logger.error("Uncaught Exception", {
+        error: error,
+        stack: error.stack
+    });
+    
+    // Keep the process running for a moment to ensure the log is written
+    setTimeout(() => process.exit(1), 1000);
+});
+
+process.on("unhandledRejection", (reason: any) => {
+    Logger.error("Unhandled Rejection", {
+        reason: reason
+    });
+});
 
 /**
  * Entry point for the application
  */
 async function main() {
-    const monitor = new ClipboardMonitor();
-    
-    // Handle process termination
-    process.on("SIGINT", () => {
-        console.log("Received SIGINT signal");
-        monitor.exit();
-    });
-    
-    process.on("SIGTERM", () => {
-        console.log("Received SIGTERM signal");
-        monitor.exit();
-    });
-    
-    // Initialize and start monitoring
-    await monitor.init();
+    try {
+        const monitor = new ClipboardMonitor();
+        
+        // Handle process termination
+        process.on("SIGINT", () => {
+            Logger.info("Received SIGINT signal");
+            monitor.exit();
+        });
+        
+        process.on("SIGTERM", () => {
+            Logger.info("Received SIGTERM signal");
+            monitor.exit();
+        });
+        
+        // Initialize and start monitoring
+        await monitor.init();
+        
+        // Keep the process running
+        while (true) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    } catch (error) {
+        Logger.error("Error in main", {
+            error: error instanceof Error ? error : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        });
+        
+        // Rethrow to trigger global handler
+        throw error;
+    }
 }
 
 // Run the application
-main().catch(console.error);
+main().catch(error => {
+    Logger.error("Failed to start application", {
+        error: error instanceof Error ? error : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+    });
+    process.exit(1);
+});
