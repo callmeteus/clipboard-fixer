@@ -22,6 +22,8 @@ export class Logger {
             format: winston.format.combine(
                 winston.format.timestamp(),
                 winston.format.errors({ stack: true }),
+                winston.format.colorize(),
+                winston.format.splat(),
                 winston.format.printf(({ level, message, timestamp, ...meta }) => {
                     const metaString = Object.keys(meta).length ? JSON.stringify(meta) : "";
                     return `${timestamp} [${level}]: ${message} ${metaString}`;

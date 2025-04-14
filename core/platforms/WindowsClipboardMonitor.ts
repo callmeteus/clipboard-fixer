@@ -51,7 +51,7 @@ export class WindowsClipboardMonitor {
                     }
 
                     // Decode the value
-                    const text = new TextDecoder().decode(value).replace(/(\r\n|\n|\r)$/, "");
+                    const text = new TextDecoder().decode(value).replace(/(\r\n|\n|\r|\n)$/, "");
 
                     // If received text, check if it's a clipboard update or an error
                     if (text) {
