@@ -54,7 +54,7 @@ export class ClipboardMonitor {
     constructor() {
         // Set process title
         process.title = "Fix embeddedable links";
-        
+
         // Hide console window on Windows
         if (process.platform === "win32") {
             this.toggleDebugWindow(false);
@@ -133,7 +133,7 @@ export class ClipboardMonitor {
 
             Logger.info("Tray icon initialized");
         } catch (error) {
-            Logger.error("Failed to initialize tray: %s", error);
+            Logger.error("Failed to initialize tray", { error });
         }
     }
 
@@ -156,7 +156,7 @@ export class ClipboardMonitor {
             // Update icon
             this.tray.setIcon(iconBuff);
         } catch (error) {
-            Logger.error("Error updating tray: %s", error);
+            Logger.error("Error updating tray", { error });
         }
     }
 
@@ -165,7 +165,7 @@ export class ClipboardMonitor {
      */
     toggleMonitoring() {
         this.isMonitoringEnabled = !this.isMonitoringEnabled;
-        Logger.info("Clipboard monitoring %s", this.isMonitoringEnabled ? "enabled" : "disabled");
+        Logger.info(`Clipboard monitoring ${this.isMonitoringEnabled ? "enabled" : "disabled"}`);
         
         // Update tray
         this.updateTray();
@@ -186,9 +186,10 @@ export class ClipboardMonitor {
                     
                     // Only update if the content has changed
                     if (fixedText !== text) {
-                        Logger.info("Detected link! Replacing...");
-                        Logger.info("Original: %s", text);
-                        Logger.info("Fixed: %s", fixedText);
+                        Logger.info("Detected link! Replacing...", {
+                            original: text,
+                            fixed: fixedText
+                        });
                         
                         // Update the clipboard
                         if (!await this.writeClipboard(fixedText)) {
@@ -291,7 +292,7 @@ export class ClipboardMonitor {
             
             return "";
         } catch (e) {
-            Logger.error("Error reading clipboard: %s", e);
+            Logger.error("Error reading clipboard", { error: e });
             return "";
         }
     }
@@ -336,7 +337,7 @@ export class ClipboardMonitor {
             
             return false;
         } catch (e) {
-            Logger.error("Error writing to clipboard: %s", e);
+            Logger.error("Error writing to clipboard", { error: e });
             return false;
         }
     }
@@ -374,7 +375,10 @@ export class ClipboardMonitor {
                 
                 // Only update if the content has changed
                 if (fixedContent !== clipboardContent) {
-                    Logger.info("Detected link! Replacing...\nOriginal: %s\nFixed: %s", clipboardContent, fixedContent);
+                    Logger.info("Detected link! Replacing...", {
+                        original: clipboardContent,
+                        fixed: fixedContent
+                    });
                     
                     // Update the clipboard
                     if (!await this.writeClipboard(fixedContent)) {
@@ -386,7 +390,7 @@ export class ClipboardMonitor {
                 }
             }
         } catch (error) {
-            Logger.error("Error in clipboard monitoring: %s", error);
+            Logger.error("Error in clipboard monitoring", { error });
         }
     }
 
@@ -396,7 +400,7 @@ export class ClipboardMonitor {
      */
     private toggleDebugWindow(show: boolean) {
         if (process.platform === "win32") {
-            const command = show ? "Show-Console" : "Hide-Console";
+            // Spawn the powershell command to show or hide the console window
             spawn(["powershell.exe", "-WindowStyle", "Hidden", "-Command", `
                 Add-Type @"
                 using System;
@@ -411,6 +415,7 @@ export class ClipboardMonitor {
                 $console = [Win32]::GetConsoleWindow()
                 [Win32]::ShowWindow($console, ${show ? "5" : "0"})
             `]);
+
             this.isDebugWindowVisible = show;
         }
     }
