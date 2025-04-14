@@ -1,3 +1,5 @@
+import { Logger } from "../core/Logger";
+
 export class ContentReplacer {
     constructor(
         /**
@@ -24,7 +26,7 @@ export class ContentReplacer {
 
         // Replace all matches
         while ((match = result.match(this.pattern))) {
-            console.info("Found match %s, replacing with %s", match[0], this.replacement);
+            Logger.debug("Found match %s, replacing with %s", match[0], this.replacement);
             result = result.replace(match[0], this.replacement);
         }
 

@@ -1,11 +1,11 @@
+import { file, spawn } from "bun";
+import path from "path";
 import Tray from "trayicon";
-
-import { file } from "bun";
 import iconDisabledUrl from "../assets/icon-disabled.ico" with { type: "file" };
 import iconEnabledUrl from "../assets/icon-enabled.ico" with { type: "file" };
-
-import path from "path";
 import { ContentReplacer } from "../model/UrlReplacer";
+import { Logger } from "./Logger";
+import { WindowsClipboardMonitor } from "./platforms/WindowsClipboardMonitor";
 
 /**
  * Class for clipboard monitoring and fixing links
@@ -29,7 +29,7 @@ export class ClipboardMonitor {
     /**
      * The Windows system tray icon.
      */
-    private tray = null;
+    private tray: Tray | null = null;
 
     /**
      * The polling interval in milliseconds.
@@ -41,16 +41,31 @@ export class ClipboardMonitor {
      */
     private intervalId: NodeJS.Timeout | null = null;
 
+    /**
+     * The Windows clipboard monitor instance.
+     */
+    private windowsMonitor: WindowsClipboardMonitor | null = null;
+
+    /**
+     * Flag to indicate if debug window is visible.
+     */
+    private isDebugWindowVisible: boolean = false;
+
     constructor() {
         // Set process title
         process.title = "Fix embeddedable links";
+        
+        // Hide console window on Windows
+        if (process.platform === "win32") {
+            this.toggleDebugWindow(false);
+        }
     }
 
     /**
      * Initialize the application.
      */
     async init() {
-        console.info("Loading replacers...");
+        Logger.info("Loading replacers...");
 
         // Get the replacers folder
         const replacersFolder = path.resolve(process.cwd(), "config", "replacers");
@@ -78,23 +93,22 @@ export class ClipboardMonitor {
             }
         }
 
-        console.info("Found %d replacers", this.replacers.length);
+        Logger.info("Found %d replacers", this.replacers.length);
         
-        console.log("Starting clipboard monitor with tray icon...");
+        Logger.info("Starting clipboard monitor with tray icon...");
 
         // Initialize tray if on Windows
         if (process.platform === "win32") {
-            console.info("Initializing tray icon...");
+            Logger.info("Initializing tray icon...");
             await this.initTray();
         } else {
-            console.info("Tray icon is only supported on Windows");
-            console.log("Tray icon is only supported on Windows");
+            Logger.info("Tray icon is only supported on Windows");
         }
 
         // Start monitoring
         this.startMonitoring();
 
-        console.log("Press Ctrl+C to exit or use the tray icon");
+        Logger.info("Press Ctrl+C to exit or use the tray icon");
     }
 
     /**
@@ -110,15 +124,16 @@ export class ClipboardMonitor {
                 .catch(reject);
             });
 
-            this.tray.item("Enable Monitoring", () => this.toggleMonitoring());
-            this.tray.item("Exit", () => this.exit());
+            this.tray!.item("Enable Monitoring", () => this.toggleMonitoring());
+            this.tray!.item("Show Debug Window", () => this.toggleDebugWindow(!this.isDebugWindowVisible));
+            this.tray!.item("Exit", () => this.exit());
 
             // Update tray icon
             this.updateTray();
 
-            console.log("Tray icon initialized");
+            Logger.info("Tray icon initialized");
         } catch (error) {
-            console.error("Failed to initialize tray:", error);
+            Logger.error("Failed to initialize tray: %s", error);
         }
     }
 
@@ -141,7 +156,7 @@ export class ClipboardMonitor {
             // Update icon
             this.tray.setIcon(iconBuff);
         } catch (error) {
-            console.error("Error updating tray:", error);
+            Logger.error("Error updating tray: %s", error);
         }
     }
 
@@ -150,7 +165,7 @@ export class ClipboardMonitor {
      */
     toggleMonitoring() {
         this.isMonitoringEnabled = !this.isMonitoringEnabled;
-        console.log(`Clipboard monitoring ${this.isMonitoringEnabled ? "enabled" : "disabled"}`);
+        Logger.info("Clipboard monitoring %s", this.isMonitoringEnabled ? "enabled" : "disabled");
         
         // Update tray
         this.updateTray();
@@ -160,27 +175,64 @@ export class ClipboardMonitor {
      * Start the clipboard monitoring process.
      */
     startMonitoring() {
-        // Start polling
-        this.intervalId = setInterval(() => this.checkClipboard(), this.pollingInterval);
-        console.log("Clipboard monitoring started");
+        if (process.platform === "win32") {
+            // Use Windows-specific clipboard monitoring
+            this.windowsMonitor = new WindowsClipboardMonitor(async (text: string) => {
+                if (this.isMonitoringEnabled && text !== this.lastClipboardContent) {
+                    this.lastClipboardContent = text;
+                    
+                    // Process the text with replacers
+                    const fixedText = this.detectAndFixLinks(text);
+                    
+                    // Only update if the content has changed
+                    if (fixedText !== text) {
+                        Logger.info("Detected link! Replacing...");
+                        Logger.info("Original: %s", text);
+                        Logger.info("Fixed: %s", fixedText);
+                        
+                        // Update the clipboard
+                        if (!await this.writeClipboard(fixedText)) {
+                            Logger.error("Failed to update clipboard");
+                        }
+                        
+                        // Update our stored content to prevent loop
+                        this.lastClipboardContent = fixedText;
+                    }
+                }
+            });
+
+            this.windowsMonitor.start();
+            Logger.info("Clipboard monitoring started (real-time)");
+        } else {
+            // Fallback to polling for other platforms
+            this.intervalId = setInterval(() => this.checkClipboard(), this.pollingInterval);
+            Logger.info("Clipboard monitoring started (polling)");
+        }
     }
 
     /**
      * Stop the clipboard monitoring process.
      */
     stopMonitoring() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-            console.log("Clipboard monitoring stopped");
+        if (process.platform === "win32") {
+            if (this.windowsMonitor) {
+                this.windowsMonitor.stop();
+                this.windowsMonitor = null;
+            }
+        } else {
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
         }
+        Logger.info("Clipboard monitoring stopped");
     }
 
     /**
      * Exit the application
      */
     exit() {
-        console.log("Exiting application");
+        Logger.info("Exiting application");
         this.stopMonitoring();
         
         process.exit(0);
@@ -239,7 +291,7 @@ export class ClipboardMonitor {
             
             return "";
         } catch (e) {
-            console.error("Error reading clipboard:", e);
+            Logger.error("Error reading clipboard: %s", e);
             return "";
         }
     }
@@ -284,7 +336,7 @@ export class ClipboardMonitor {
             
             return false;
         } catch (e) {
-            console.error("Error writing to clipboard:", e);
+            Logger.error("Error writing to clipboard: %s", e);
             return false;
         }
     }
@@ -322,13 +374,11 @@ export class ClipboardMonitor {
                 
                 // Only update if the content has changed
                 if (fixedContent !== clipboardContent) {
-                    console.log(`Detected link! Replacing...`);
-                    console.log(`Original: ${clipboardContent}`);
-                    console.log(`Fixed: ${fixedContent}`);
+                    Logger.info("Detected link! Replacing...\nOriginal: %s\nFixed: %s", clipboardContent, fixedContent);
                     
                     // Update the clipboard
                     if (!await this.writeClipboard(fixedContent)) {
-                        console.error("Failed to update clipboard");
+                        Logger.error("Failed to update clipboard");
                     }
                     
                     // Update our stored content to prevent loop
@@ -336,7 +386,32 @@ export class ClipboardMonitor {
                 }
             }
         } catch (error) {
-            console.error("Error in clipboard monitoring:", error);
+            Logger.error("Error in clipboard monitoring: %s", error);
+        }
+    }
+
+    /**
+     * Toggle debug window visibility.
+     * @param show Whether to show or hide the debug window.
+     */
+    private toggleDebugWindow(show: boolean) {
+        if (process.platform === "win32") {
+            const command = show ? "Show-Console" : "Hide-Console";
+            spawn(["powershell.exe", "-WindowStyle", "Hidden", "-Command", `
+                Add-Type @"
+                using System;
+                using System.Runtime.InteropServices;
+                public class Win32 {
+                    [DllImport("kernel32.dll")]
+                    public static extern IntPtr GetConsoleWindow();
+                    [DllImport("user32.dll")]
+                    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                }
+                "@
+                $console = [Win32]::GetConsoleWindow()
+                [Win32]::ShowWindow($console, ${show ? "5" : "0"})
+            `]);
+            this.isDebugWindowVisible = show;
         }
     }
 }
