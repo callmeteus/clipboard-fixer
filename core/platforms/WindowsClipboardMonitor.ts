@@ -26,7 +26,6 @@ export class WindowsClipboardMonitor {
      * Start the clipboard monitoring process.
      */
     async start() {
-        console.log(scriptContents);
         // Write the script to a temporary file
         const scriptPath = path.resolve(tmpdir(), "clipboard-monitor.ps1");
         await Bun.write(scriptPath, scriptContents);
@@ -52,7 +51,7 @@ export class WindowsClipboardMonitor {
                     }
 
                     // Decode the value
-                    const text = new TextDecoder().decode(value);
+                    const text = new TextDecoder().decode(value).replace(/(\r\n|\n|\r)$/, "");
 
                     // If received text, check if it's a clipboard update or an error
                     if (text) {
@@ -61,19 +60,19 @@ export class WindowsClipboardMonitor {
                             // Remove the prefix
                             const clipboardText = text.substring("CLIPBOARD_UPDATE:".length);
                             
-                            Logger.debug("Received clipboard update", { text: clipboardText });
+                            Logger.debug("Received clipboard update: %s", clipboardText);
 
                             // Call the callback function
                             this.onUpdate(clipboardText);
                         } else
                         if (text.startsWith("ERROR:")) {
                             // Log the error
-                            Logger.error("PowerShell error", { error: text.substring("ERROR:".length) });
+                            Logger.error("PowerShell error: %s", text.substring("ERROR:".length));
                         }
                     }
                 }
             } catch (error) {
-                Logger.error("Error reading clipboard stream", { error });
+                Logger.error("Error reading clipboard stream: %s", error);
             }
         };
 
@@ -100,11 +99,11 @@ export class WindowsClipboardMonitor {
 
                     // If received text, log the error
                     if (text) {
-                        Logger.error("PowerShell stderr", { error: text });
+                        Logger.error("PowerShell stderr: %s", text);
                     }
                 }
             } catch (error) {
-                Logger.error("Error reading error stream", { error });
+                Logger.error("Error reading error stream: %s", error);
             }
         };
 

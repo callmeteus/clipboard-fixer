@@ -26,10 +26,7 @@ export class ContentReplacer {
 
         // Replace all matches
         while ((match = result.match(this.pattern))) {
-            Logger.debug("Found match", { 
-                match: match[0], 
-                replacement: this.replacement 
-            });
+            Logger.debug("Found match %s, replacing with %s", match[0], this.replacement);
             result = result.replace(match[0], this.replacement);
         }
 
