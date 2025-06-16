@@ -32,25 +32,23 @@ process.on("unhandledRejection", (reason: any) => {
 async function main() {
     try {
         const monitor = new ClipboardMonitor();
-        
+
         // Handle process termination
         process.on("SIGINT", () => {
             Logger.info("Received SIGINT signal");
             monitor.exit();
         });
-        
+
         process.on("SIGTERM", () => {
             Logger.info("Received SIGTERM signal");
             monitor.exit();
         });
-        
+
         // Initialize and start monitoring
         await monitor.init();
-        
+
         // Keep the process running
-        while (true) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+        keepAlive();
     } catch (error) {
         Logger.error("Error in main", {
             error: error instanceof Error ? error : String(error),
@@ -68,5 +66,15 @@ main().catch(error => {
         error: error instanceof Error ? error : String(error),
         stack: error instanceof Error ? error.stack : undefined
     });
+
     process.exit(1);
 });
+
+/**
+ * Keep the process alive by setting a recursive timeout
+ */
+function keepAlive() {
+    setTimeout(() => {
+        keepAlive();
+    }, 1000);
+}

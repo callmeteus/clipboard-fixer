@@ -5,7 +5,7 @@ import iconDisabledUrl from "../assets/icon-disabled.ico" with { type: "file" };
 import iconEnabledUrl from "../assets/icon-enabled.ico" with { type: "file" };
 import { ContentReplacer } from "../model/UrlReplacer";
 import { Logger } from "./Logger";
-import { WindowsClipboardMonitor } from "./platforms/WindowsClipboardMonitor";
+import type { BaseClipboardMonitor } from "./platforms/BaseClipboardMonitor";
 
 /**
  * Class for clipboard monitoring and fixing links
@@ -32,19 +32,9 @@ export class ClipboardMonitor {
     private tray: Tray | null = null;
 
     /**
-     * The polling interval in milliseconds.
+     * The platform-specific clipboard monitor.
      */
-    private pollingInterval: number = 500;
-
-    /**
-     * The interval ID for the clipboard monitoring.
-     */
-    private intervalId: NodeJS.Timeout | null = null;
-
-    /**
-     * The Windows clipboard monitor instance.
-     */
-    private windowsMonitor: WindowsClipboardMonitor | null = null;
+    private monitor: BaseClipboardMonitor | null = null;
 
     /**
      * Flag to indicate if debug window is visible.
@@ -171,60 +161,68 @@ export class ClipboardMonitor {
         this.updateTray();
     }
 
+    private async handleClipboardUpdate(text: string) {
+        if (!this.isMonitoringEnabled) {
+            return;
+        }
+
+        if (text === this.lastClipboardContent) {
+            return;
+        }
+
+        this.lastClipboardContent = text;
+        
+        // Process the text with replacers
+        const fixedText = this.detectAndFixLinks(text);
+        
+        // Only update if the content has changed
+        if (fixedText !== text) {
+            Logger.info("Detected link! Replacing...");
+            Logger.info("Original: %s", text);
+            Logger.info("Fixed: %s", fixedText);
+            
+            // Update the clipboard 
+            if (!await this.monitor!.writeClipboard(fixedText)) {
+                Logger.error("Failed to update clipboard");
+            }
+            
+            // Update our stored content to prevent loop
+            this.lastClipboardContent = fixedText;
+        }
+    }
+
     /**
      * Start the clipboard monitoring process.
      */
-    startMonitoring() {
+    async startMonitoring() {
         if (process.platform === "win32") {
-            // Use Windows-specific clipboard monitoring
-            this.windowsMonitor = new WindowsClipboardMonitor(async (text: string) => {
-                if (this.isMonitoringEnabled && text !== this.lastClipboardContent) {
-                    this.lastClipboardContent = text;
-                    
-                    // Process the text with replacers
-                    const fixedText = this.detectAndFixLinks(text);
-                    
-                    // Only update if the content has changed
-                    if (fixedText !== text) {
-                        Logger.info("Detected link! Replacing...");
-                        Logger.info("Original: %s", text);
-                        Logger.info("Fixed: %s", fixedText);
-                        
-                        // Update the clipboard
-                        if (!await this.writeClipboard(fixedText)) {
-                            Logger.error("Failed to update clipboard");
-                        }
-                        
-                        // Update our stored content to prevent loop
-                        this.lastClipboardContent = fixedText;
-                    }
-                }
-            });
+            const { WindowsClipboardMonitor } = await import("./platforms/WindowsClipboardMonitor");
 
-            this.windowsMonitor.start();
-            Logger.info("Clipboard monitoring started (real-time)");
+            // Use Windows-specific clipboard monitoring
+            this.monitor = new WindowsClipboardMonitor(this.handleClipboardUpdate.bind(this));
+        } else
+        if (process.platform === "linux") {
+            const { LinuxClipboardMonitor } = await import("./platforms/LinuxClipboardMonitor");
+
+            // Use Linux-specific clipboard monitoring
+            this.monitor = new LinuxClipboardMonitor(this.handleClipboardUpdate.bind(this));
         } else {
-            // Fallback to polling for other platforms
-            this.intervalId = setInterval(() => this.checkClipboard(), this.pollingInterval);
-            Logger.info("Clipboard monitoring started (polling)");
+            throw new Error("Unsupported platform: " + process.platform);
         }
+
+        // Start the monitor
+        this.monitor.start();
     }
 
     /**
      * Stop the clipboard monitoring process.
      */
     stopMonitoring() {
-        if (process.platform === "win32") {
-            if (this.windowsMonitor) {
-                this.windowsMonitor.stop();
-                this.windowsMonitor = null;
-            }
-        } else {
-            if (this.intervalId) {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
-            }
+        if (this.monitor) {
+            this.monitor.stop();
+            this.monitor = null;
         }
+
         Logger.info("Clipboard monitoring stopped");
     }
 
@@ -243,7 +241,7 @@ export class ClipboardMonitor {
      * @param text The string to detect and fix links in.
      * @returns The fixed string or null if no links were found.
      */
-    detectAndFixLinks(text: string) {
+    private detectAndFixLinks(text: string) {
         if (!text) {
             return text;
         }
@@ -252,142 +250,6 @@ export class ClipboardMonitor {
         return this.replacers.reduce((currentText, replacer) => {
             return replacer.apply(currentText);
         }, text);
-    }
-
-    /**
-     * Read clipboard content.
-     * @returns The clipboard content or an empty string if reading fails.
-     * @throws Error if reading fails.
-     */
-    async readClipboard(): Promise<string> {
-        try {
-            // On Windows, use PowerShell to read the clipboard
-            if (process.platform === "win32") {
-                const proc = Bun.spawn(["powershell.exe", "-command", "Get-Clipboard"], {
-                    stdout: "pipe",
-                });
-                
-                const output = await new Response(proc.stdout).text();
-                return output.trim();
-            } else
-            // On macOS
-            if (process.platform === "darwin") {
-                const proc = Bun.spawn(["pbpaste"], {
-                    stdout: "pipe",
-                });
-                
-                const output = await new Response(proc.stdout).text();
-                return output.trim();
-            } else
-            // On Linux, try xclip
-            if (process.platform === "linux") {
-                const proc = Bun.spawn(["xclip", "-selection", "clipboard", "-o"], {
-                    stdout: "pipe",
-                });
-                
-                const output = await new Response(proc.stdout).text();
-                return output.trim();
-            }
-            
-            return "";
-        } catch (e) {
-            Logger.error("Error reading clipboard: %s", e);
-            return "";
-        }
-    }
-
-    /**
-     * Write content to clipboard.
-     * @param text The text to write to the clipboard.
-     * @returns True if writing was successful, false otherwise.
-     */
-    async writeClipboard(text: string) {
-        try {
-            // On Windows, use PowerShell to write to the clipboard
-            if (process.platform === "win32") {
-                const proc = Bun.spawn(["powershell.exe", "-command", `Set-Clipboard -Value '${text.replace(/'/g, "''")}'`]);
-                await proc.exited;
-                return true;
-            } else
-            // On macOS
-            if (process.platform === "darwin") { 
-                const proc = Bun.spawn(["pbcopy"], {
-                    stdin: "pipe",
-                });
-                
-                proc.stdin.write(text);
-                proc.stdin.end();
-                
-                await proc.exited;
-                return true;
-            } else
-            // On Linux, try xclip
-            if (process.platform === "linux") {
-                const proc = Bun.spawn(["xclip", "-selection", "clipboard"], {
-                    stdin: "pipe",
-                });
-                
-                proc.stdin.write(text);
-                proc.stdin.end();
-                
-                await proc.exited;
-                return true;
-            }
-            
-            return false;
-        } catch (e) {
-            Logger.error("Error writing to clipboard: %s", e);
-            return false;
-        }
-    }
-
-    /**
-     * Check clipboard for content and process it.
-     * @throws Error if an error occurs.
-     */
-    async checkClipboard() {
-        try {
-            // Skip if monitoring is disabled
-            if (!this.isMonitoringEnabled) {
-                return;
-            }
-            
-            // Read the current clipboard content
-            const clipboardContent = await this.readClipboard();
-            
-            // If has no length, skip
-            if (!clipboardContent?.length) {
-                return;
-            }
-            
-            // Check if the content has changed
-            if (clipboardContent !== this.lastClipboardContent) {
-                this.lastClipboardContent = clipboardContent;
-                
-                // Process the content
-                const fixedContent = this.detectAndFixLinks(clipboardContent);
-                
-                // Ignore if `fixedContent` is null
-                if (!fixedContent) {
-                    return;
-                }
-                
-                // Only update if the content has changed
-                if (fixedContent !== clipboardContent) {
-                    Logger.info("Detected link! Replacing...\nOriginal: %s\nFixed: %s", clipboardContent, fixedContent);
-                    
-                    // Update the clipboard
-                    if (!await this.writeClipboard(fixedContent)) {
-                        Logger.error("Failed to update clipboard");
-                    }
-                    
-                    // Update our stored content to prevent loop
-                    this.lastClipboardContent = fixedContent;
-                }
-            }
-        } catch (error) {
-            Logger.error("Error in clipboard monitoring: %s", error);
-        }
     }
 
     /**

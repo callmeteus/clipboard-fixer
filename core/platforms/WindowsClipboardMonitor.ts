@@ -3,24 +3,16 @@ import { tmpdir } from "os";
 import path from "path";
 import scriptContents from "../../assets/scripts/clipboard-monitor.ps1" with { type: "text" };
 import { Logger } from "../Logger";
+import { BaseClipboardMonitor } from "./BaseClipboardMonitor";
 
 /**
- * Class for Windows-specific clipboard monitoring
+ * Class for monitoring clipboard on Windows systems
  */
-export class WindowsClipboardMonitor {
+export class WindowsClipboardMonitor extends BaseClipboardMonitor {
     /**
      * The PowerShell process for clipboard monitoring.
      */
-    private clipboardProcess: any = null;
-
-    /**
-     * Callback function for clipboard updates.
-     */
-    private onUpdate: (text: string) => void;
-
-    constructor(onUpdate: (text: string) => void) {
-        this.onUpdate = onUpdate;
-    }
+    private process: Bun.Subprocess<"ignore", "pipe", "pipe"> | null = null;
 
     /**
      * Start the clipboard monitoring process.
@@ -31,21 +23,20 @@ export class WindowsClipboardMonitor {
         await Bun.write(scriptPath, scriptContents);
 
         // Start PowerShell process with hidden window
-        this.clipboardProcess = spawn(["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", scriptPath], {
+        this.process = spawn(["powershell.exe", "-WindowStyle", "Hidden", "-File", scriptPath], {
             stdout: "pipe",
-            stderr: "pipe"
+            stderr: "pipe",
         });
 
-        // Handle clipboard updates
-        const reader = this.clipboardProcess.stdout.getReader();
-
-        /**
-         * Reads the stream
-         */
+        // Read the stream
         const readStream = async () => {
+            const reader = this.process!.stdout.getReader();
+
             try {
                 while (true) {
                     const { done, value } = await reader.read();
+
+                    // If done, break
                     if (done) {
                         break;
                     }
@@ -55,71 +46,83 @@ export class WindowsClipboardMonitor {
 
                     // If received text, check if it's a clipboard update or an error
                     if (text) {
-                        // If it's a clipboard update
-                        if (text.startsWith("CLIPBOARD_UPDATE:")) {
-                            // Remove the prefix
-                            const clipboardText = text.substring("CLIPBOARD_UPDATE:".length);
-                            
-                            Logger.debug("Received clipboard update: %s", clipboardText);
-
-                            // Call the callback function
-                            this.onUpdate(clipboardText);
-                        } else
                         if (text.startsWith("ERROR:")) {
-                            // Log the error
-                            Logger.error("PowerShell error: %s", text.substring("ERROR:".length));
+                            Logger.error("PowerShell error: %s", text.substring(6));
+                        } else {
+                            this.onUpdate(text);
                         }
                     }
                 }
             } catch (error) {
-                Logger.error("Error reading clipboard stream: %s", error);
+                Logger.error("Error reading PowerShell output: %s", error);
+            } finally {
+                reader.releaseLock();
             }
         };
 
-        readStream();
-
-        // Also handle stderr
-        const errorReader = this.clipboardProcess.stderr.getReader();
-
-        /**
-         * Reads the error stream
-         */
+        // Read the error stream
         const readErrorStream = async () => {
+            const reader = this.process!.stderr.getReader();
+
             try {
                 while (true) {
-                    // Read the error stream
-                    const { done, value } = await errorReader.read();
+                    const { done, value } = await reader.read();
 
-                    // If done, break
                     if (done) {
                         break;
                     }
 
-                    const text = new TextDecoder().decode(value).trim();
-
-                    // If received text, log the error
-                    if (text) {
-                        Logger.error("PowerShell stderr: %s", text);
-                    }
+                    const text = new TextDecoder().decode(value);
+                    Logger.error("PowerShell error: %s", text);
                 }
             } catch (error) {
-                Logger.error("Error reading error stream: %s", error);
+                Logger.error("Error reading PowerShell error output: %s", error);
+            } finally {
+                reader.releaseLock();
             }
         };
 
+        // Read the stream
+        readStream();
+
+        // Read the error stream
         readErrorStream();
 
-        Logger.info("Windows clipboard monitoring started");
+        Logger.info("Windows clipboard monitoring started (real-time)");
     }
 
     /**
      * Stop the clipboard monitoring process.
      */
     stop() {
-        if (this.clipboardProcess) {
-            this.clipboardProcess.kill();
-            this.clipboardProcess = null;
-            Logger.info("Windows clipboard monitoring stopped");
+        if (this.process) {
+            this.process.kill();
+            this.process = null;
+        }
+        Logger.info("Windows clipboard monitoring stopped");
+    }
+
+    /**
+     * Write content to clipboard
+     * @param text The text to write to the clipboard
+     * @returns True if writing was successful, false otherwise
+     */
+    async writeClipboard(text: string): Promise<boolean> {
+        try {
+            // Use the existing process to write to clipboard
+            if (!this.process) {
+                throw new Error("PowerShell process not running");
+            }
+
+            // Write the command to the process's stdin
+            const encoder = new TextEncoder();
+            const command = `Set-Clipboard -Value '${text.replace(/'/g, "''")}'\n`;
+            await this.process!.stdin!.write(encoder.encode(command));
+
+            return true;
+        } catch (e) {
+            Logger.error("Error writing to clipboard: %s", e);
+            return false;
         }
     }
 } 
