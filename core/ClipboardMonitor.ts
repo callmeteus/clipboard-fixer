@@ -1,4 +1,4 @@
-import { file, spawn } from "bun";
+import { file } from "bun";
 import path from "path";
 import Tray from "trayicon";
 import iconDisabledUrl from "../assets/icon-disabled.ico" with { type: "file" };
@@ -6,6 +6,7 @@ import iconEnabledUrl from "../assets/icon-enabled.ico" with { type: "file" };
 import { ContentReplacer } from "../model/UrlReplacer";
 import { Logger } from "./Logger";
 import type { BaseClipboardMonitor } from "./platforms/BaseClipboardMonitor";
+import { InteractivePowerShell } from "./platforms/win32/InteractivePowerShell";
 
 /**
  * Class for clipboard monitoring and fixing links
@@ -40,6 +41,11 @@ export class ClipboardMonitor {
      * Flag to indicate if debug window is visible.
      */
     private isDebugWindowVisible: boolean = false;
+
+    /**
+     * The PowerShell process for window management.
+     */
+    private powershell: InteractivePowerShell | null = null;
 
     constructor() {
         // Set process title
@@ -233,6 +239,11 @@ export class ClipboardMonitor {
     exit() {
         Logger.info("Exiting application");
         this.stopMonitoring();
+
+        // Destroy PowerShell process if it exists
+        if (this.powershell) {
+            this.powershell.destroy();
+        }
         
         process.exit(0);
     }
@@ -258,10 +269,9 @@ export class ClipboardMonitor {
      * @param visible Whether to show or hide the debug window.
      */
     private toggleDebugWindow(visible: boolean) {
-        if (process.platform === "win32") {
-            // Spawn the powershell command to show or hide the console window
-            spawn(["powershell.exe", "-WindowStyle", "Hidden", "-Command", `
-                Add-Type @"
+        this.powershell ??= new InteractivePowerShell({
+            command: /*powershell*/`
+                $code = @'
                 using System;
                 using System.Runtime.InteropServices;
                 public class Win32 {
@@ -270,10 +280,15 @@ export class ClipboardMonitor {
                     [DllImport("user32.dll")]
                     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
                 }
-                "@
+'@
+                Add-Type -TypeDefinition $code
                 $console = [Win32]::GetConsoleWindow()
-                [Win32]::ShowWindow($console, ${visible ? "5" : "0"})
-            `]);
+            `
+        });
+
+        if (process.platform === "win32") {
+            // Use a direct PowerShell command
+            this.powershell.execute(/*powershell*/`[Win32]::ShowWindow($console, ${visible ? "1" : "0"})`);
 
             // Update the flag
             this.isDebugWindowVisible = visible;

@@ -32,6 +32,7 @@
     },
     "dependencies": {
         "clipboardy": "^4.0.0",
+        "ffi-napi": "^4.0.3",
         "trayicon": "^1.2.2",
         "winston": "^3.12.0"
     }
