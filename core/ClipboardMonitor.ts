@@ -29,7 +29,7 @@ export class ClipboardMonitor {
     /**
      * The Windows system tray icon.
      */
-    private tray: Tray | null = null;
+    private tray: any | null = null;
 
     /**
      * The platform-specific clipboard monitor.
@@ -46,9 +46,7 @@ export class ClipboardMonitor {
         process.title = "Fix embeddedable links";
 
         // Hide console window on Windows
-        if (process.platform === "win32") {
-            this.toggleDebugWindow(false);
-        }
+        this.toggleDebugWindow(false);
     }
 
     /**
@@ -84,15 +82,11 @@ export class ClipboardMonitor {
         }
 
         Logger.info("Found %d replacers", this.replacers.length);
-        
-        Logger.info("Starting clipboard monitor with tray icon...");
 
         // Initialize tray if on Windows
         if (process.platform === "win32") {
             Logger.info("Initializing tray icon...");
             await this.initTray();
-        } else {
-            Logger.info("Tray icon is only supported on Windows");
         }
 
         // Start monitoring
@@ -105,6 +99,10 @@ export class ClipboardMonitor {
      * Initialize the system tray icon.
      */
     private async initTray() {
+        if (this.tray) {
+            throw new Error("`initTray` can only be called once");
+        }
+
         try {
             // Create tray icon
             this.tray = await new Promise((resolve, reject) => {
@@ -113,10 +111,6 @@ export class ClipboardMonitor {
                 }, resolve)
                 .catch(reject);
             });
-
-            this.tray!.item("Enable Monitoring", () => this.toggleMonitoring());
-            this.tray!.item("Show Debug Window", () => this.toggleDebugWindow(!this.isDebugWindowVisible));
-            this.tray!.item("Exit", () => this.exit());
 
             // Update tray icon
             this.updateTray();
@@ -135,6 +129,13 @@ export class ClipboardMonitor {
         if (!this.tray) {
             return;
         }
+
+        // Set menu items
+        this.tray!.setMenu(
+            this.tray!.item(this.isMonitoringEnabled ? "Disable Monitoring" : "Enable Monitoring", () => this.toggleMonitoring()),
+            this.tray!.item(this.isDebugWindowVisible ? "Hide Debug Window" : "Show Debug Window", () => this.toggleDebugWindow(!this.isDebugWindowVisible)),
+            this.tray!.item("Exit", () => this.exit())
+        );
         
         try {
             // Get icon path
@@ -153,10 +154,10 @@ export class ClipboardMonitor {
     /**
      * Toggle monitoring state.
      */
-    toggleMonitoring() {
+    private toggleMonitoring() {
         this.isMonitoringEnabled = !this.isMonitoringEnabled;
         Logger.info("Clipboard monitoring %s", this.isMonitoringEnabled ? "enabled" : "disabled");
-        
+
         // Update tray
         this.updateTray();
     }
@@ -254,9 +255,9 @@ export class ClipboardMonitor {
 
     /**
      * Toggle debug window visibility.
-     * @param show Whether to show or hide the debug window.
+     * @param visible Whether to show or hide the debug window.
      */
-    private toggleDebugWindow(show: boolean) {
+    private toggleDebugWindow(visible: boolean) {
         if (process.platform === "win32") {
             // Spawn the powershell command to show or hide the console window
             spawn(["powershell.exe", "-WindowStyle", "Hidden", "-Command", `
@@ -271,10 +272,16 @@ export class ClipboardMonitor {
                 }
                 "@
                 $console = [Win32]::GetConsoleWindow()
-                [Win32]::ShowWindow($console, ${show ? "5" : "0"})
+                [Win32]::ShowWindow($console, ${visible ? "5" : "0"})
             `]);
 
-            this.isDebugWindowVisible = show;
+            // Update the flag
+            this.isDebugWindowVisible = visible;
+
+            Logger.info("Debug window %s", visible ? "shown" : "hidden");
         }
+
+        // Update tray
+        this.updateTray();
     }
 }

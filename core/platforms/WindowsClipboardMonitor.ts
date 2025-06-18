@@ -12,7 +12,7 @@ export class WindowsClipboardMonitor extends BaseClipboardMonitor {
     /**
      * The PowerShell process for clipboard monitoring.
      */
-    private process: Bun.Subprocess<"ignore", "pipe", "pipe"> | null = null;
+    private process: Bun.Subprocess<"pipe", "pipe", "pipe"> | null = null;
 
     /**
      * Start the clipboard monitoring process.
@@ -26,6 +26,7 @@ export class WindowsClipboardMonitor extends BaseClipboardMonitor {
         this.process = spawn(["powershell.exe", "-WindowStyle", "Hidden", "-File", scriptPath], {
             stdout: "pipe",
             stderr: "pipe",
+            stdin: "pipe"
         });
 
         // Read the stream
